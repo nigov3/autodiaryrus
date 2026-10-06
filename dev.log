@@ -1,0 +1,10 @@
+
+> garage-tmp@0.0.0 dev
+> vite --port 5173
+
+
+  VITE v8.3.3  ready in 285 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+2:47:36 PM [vite] (client) [optimizer] bundling dependencies...
