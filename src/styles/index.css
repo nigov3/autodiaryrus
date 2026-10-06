@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-base text-ink font-sans antialiased;
+  /* Лёгкий шум для матовости фона */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2f3e;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .card {
+    @apply bg-card border border-line rounded-card shadow-md;
+  }
+  .card-hover {
+    @apply transition-all duration-200 hover:border-accent/50 hover:shadow-glow hover:-translate-y-0.5;
+  }
+  .btn-cta {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[15px] font-semibold text-white bg-cta shadow-glow transition-all duration-200 hover:brightness-110 hover:shadow-lg active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium text-sub border border-line bg-cardalt transition-colors duration-200 hover:text-ink hover:border-accent/60 active:scale-[0.98];
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-cardalt px-3 py-1.5 text-xs font-medium text-sub transition-colors cursor-pointer select-none;
+  }
+  .chip-active {
+    @apply border-accent/70 text-ink bg-accent/10;
+  }
+  .input {
+    @apply w-full rounded-xl bg-cardalt border border-line px-4 py-3 text-[15px] text-ink placeholder:text-faint outline-none transition-colors focus:border-accent focus:shadow-glow;
+  }
+  .label {
+    @apply block mb-1.5 text-xs font-medium uppercase tracking-wider text-faint;
+  }
+  .hud-corner {
+    @apply pointer-events-none absolute h-4 w-4 border-glow/60;
+  }
+  .skeleton {
+    @apply rounded-xl bg-gradient-to-r from-cardalt via-[#232a3d] to-cardalt bg-[length:400px_100%] animate-shimmer;
+  }
+}
