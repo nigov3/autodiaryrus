@@ -5,7 +5,7 @@ import { AppShell, PageTitle } from "../components/layout/Header.jsx";
 import CarSilhouette from "../components/common/CarSilhouette.jsx";
 import HudFrame, { Badge } from "../components/common/ui.jsx";
 import { useActiveCar } from "../hooks/useStats";
-import { rub, num } from "../lib/format";
+import { rub } from "../lib/format";
 
 /* ---------- Каталог узлов и запчастей (демо; в prod — Exist/Autodoc API по VIN) ---------- */
 const NODES = [

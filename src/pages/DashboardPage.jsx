@@ -20,7 +20,7 @@ import CarSilhouette from "../components/common/CarSilhouette.jsx";
 import HudFrame, { Badge, Progress } from "../components/common/ui.jsx";
 import { useActiveCar, useExpensesStats } from "../hooks/useStats";
 import { HEALTH_LABELS, healthColor, catById } from "../lib/categories";
-import { rub, num, dateFullRu, dateRu } from "../lib/format";
+import { rub, num, dateFullRu } from "../lib/format";
 import { loadDemo } from "../store/useGarageStore";
 
 const fadeUp = {
