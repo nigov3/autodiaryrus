@@ -1,16 +1,81 @@
-# React + Vite
+# GARAGE 🚗
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Персонализированный веб-хаб для автовладельцев: добавляешь автомобиль по VIN — и весь сервис (запчасти, расходы, ТО, страховка, штрафы) работает в контексте твоей машины.
 
-Currently, two official plugins are available:
+**Демо-дизайн-система:** Modern Card UI — тёмная тема «ночной кокпит», большие скругления, мягкие тени, градиенты, HUD-элементы, shimmer-анимации.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Возможности (MVP)
 
-## React Compiler
+| Раздел | Что умеет |
+|---|---|
+| **Онбординг** | Ввод VIN / госномера, анимация «сканирования» (частицы собираются в силуэт авто), тизер с типичными проблемами и отзывными кампаниями до регистрации |
+| **Дашборд «Мой гараж»** | SVG-карточка авто, индикаторы здоровья (двигатель / тормоза / масло), сводка (ТО, штрафы, ₽/мес, ОСАГО), алерты, таймлайн обслуживания |
+| **Дневник расходов** | Статистика (год, месяц, стоимость 1 км, средний расход), круговая диаграмма по категориям, столбчатый график по месяцам, фильтры, модалка добавления с анимацией новой записи |
+| **Подбор запчастей** | Интерактивная SVG-схема с кликабельными узлами, сравнение «оригинал / аналог / б/у» в одной карточке, поиск по VIN |
+| **Профиль** | Управление авто, проверка и оплата штрафов, блок страхования |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Стек
 
-## Expanding the Oxlint configuration
+- **React 18 + Vite** — сборка и HMR
+- **Tailwind CSS** — дизайн-система (палитра, типографика Manrope/Inter/JetBrains Mono, скругления 20–28px, тени, градиенты)
+- **Framer Motion** — анимации появления, переходы, layout-анимации списка расходов
+- **Recharts** — круговая и столбчатая диаграммы
+- **Zustand** (+ persist в localStorage) — состояние гаража, авто, расходов
+- **Lucide React** — иконки (тонкие линии 1.5px)
+- **React Router** — маршрутизация
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Быстрый старт
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # production-сборка в dist/
+npm run preview    # локальный просмотр сборки
+```
+
+При первом запуске гараж наполняется демо-автомобилем (VW Golf) с историей расходов — можно сразу смотреть графики. Все данные хранятся в `localStorage`, ничего не отправляется на сервер.
+
+### Демо-VIN для проверки декодера
+
+| VIN | Авто |
+|---|---|
+| `WVWZZZ1KZAW123456` | VW Golf, 2010, 1.4 TSI |
+| `JTMWFREV9X5123456` | Toyota RAV4, 2023, 2.5 Hybrid |
+| `WBA3A5G55DJ123456` | BMW 3 Series, 2013, 320i |
+| `KMHGG81CBJA123456` | Kia Rio, 2018, 1.6 MPI |
+
+VIN-декодер работает на моковых данных (`src/lib/vinApi.js`) — для продакшена подключается NHTSA / VinDecoder API.
+
+## Структура проекта
+
+```
+src/
+├── App.jsx                 # маршрутизация
+├── pages/                  # Home, Onboarding, Login, Dashboard, Expenses, Parts, Profile
+├── components/
+│   ├── common/             # CarSilhouette (SVG), ui (HudFrame, Badge, Progress, Skeleton)
+│   ├── home/               # VinScanAnimation, VinTizer, HomeSections
+│   ├── layout/             # Header (glassmorphism + переключатель авто + bottom-nav)
+│   └── expenses/ parts/    # компоненты разделов
+├── store/useGarageStore.js # Zustand: авто, расходы, штрафы, полисы
+├── hooks/useStats.js       # аналитика расходов (₽/км, л/100км, по категориям/месяцам)
+├── lib/                    # vinApi, categories, format
+└── styles/index.css        # дизайн-система, шум, shimmer, glassmorphism
+```
+
+## Мобильная адаптация
+
+Mobile-first: нижняя навигация из 5 пунктов, FAB для быстрого добавления расхода, компактная сетка статистики 2×2, touch-friendly элементы (≥44px), упрощённые графики без тултипов.
+
+## Дорожная карта
+
+**v1.0:** интеграция Exist/Autodoc API, калькулятор ОСАГО по КБМ, штрафы через ГИБДД API, NextAuth (SMS / Google / VK), PostgreSQL + Prisma.
+**v2.0:** карта СТО с онлайн-записью, подбор и 3D-примерка колёс, сообщество и бортжурналы, push-уведомления, PWA.
+
+## Публикация
+
+Код готов к деплою на любой static-хостинг (GitHub Pages, Netlify, Vercel). Для GitHub Pages используйте `dist/` после `npm run build`.
+
+---
+
+Сделано как MVP веб-сервиса GARAGE. Лицензия: MIT.
