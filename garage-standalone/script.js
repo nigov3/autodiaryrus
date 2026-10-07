@@ -144,7 +144,7 @@ function calcStats(car) {
 }
 
 /* ---------------- SVG car silhouette ---------------- */
-function carSVG(color = '#00D6FF', animated = false) {
+function carSVG(color = 'var(--car-line)', animated = false) {
   return `<svg class="${animated ? 'silhouette-draw' : ''}" width="340" height="130" viewBox="0 0 340 130" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M28 96 C28 82 34 76 46 72 L74 46 C84 38 96 34 112 34 L210 34 C232 34 248 40 262 52 L292 70 C306 74 314 82 314 96"/>
     <path d="M28 96 H314"/>
@@ -222,8 +222,8 @@ function renderCarSwitcher() {
 function renderHome(root) {
   root.innerHTML = `
   <section class="hero">
-    <div class="glow" style="background:#0066FF;top:-60px;left:20%"></div>
-    <div class="glow" style="background:#00D6FF;top:40px;right:15%;opacity:.16"></div>
+    <div class="glow" style="background:var(--accent);top:-60px;left:20%"></div>
+    <div class="glow" style="background:var(--accent2);top:40px;right:15%;opacity:.16"></div>
     <div class="container">
       <h1>Твой автомобиль.<br><span class="gr">Твой цифровой гараж.</span></h1>
       <p class="sub">Введи VIN — и GARAGE соберёт персональный хаб: запчасти по вин, дневник расходов, штрафы, страховка и всё, что нужно именно твоей машине.</p>
@@ -304,7 +304,7 @@ function shake(el) {
 
 function startScan(box, info) {
   box.innerHTML = `
-    <div class="scan-stage" id="stage">${carSVG('#00D6FF', true)}<div class="scanline"></div></div>
+    <div class="scan-stage" id="stage">${carSVG('var(--car-line)', true)}<div class="scanline"></div></div>
     <div class="mono dim" style="font-size:12px;text-align:center" id="scanLog">▸ декодирование WMI ${esc(info.wmi)}…</div>`;
   // частицы слетаются в силуэт
   const stage = $('#stage');
@@ -429,7 +429,7 @@ function renderDashboard(root) {
     <div class="dash-cols">
       <!-- карточка авто -->
       <div class="card card-pad hud-frame fade-in">
-        <div class="glow" style="background:#0066FF;top:-80px;right:-60px"></div>
+        <div class="glow" style="background:var(--accent);top:-80px;right:-60px"></div>
         <div class="row spread">
           <div>
             <h3 style="font-family:Unbounded;font-size:22px">${esc(car.make)} ${esc(car.model)}</h3>
@@ -751,7 +751,7 @@ function renderParts(root) {
       <div class="card card-pad hud-frame">
         <div class="field-label" style="margin:0 0 8px">Интерактивная схема — кликни узел</div>
         <svg viewBox="0 0 340 130" style="width:100%">
-          <g opacity=".9">${carSVG('#2A3B55').replace(/<svg[^>]*>|<\/svg>/g, '')}</g>
+          <g opacity=".9">${carSVG('var(--parts-car)').replace(/<svg[^>]*>|<\/svg>/g, '')}</g>
           ${NODES.map(n => `<g class="node ${n.id === selNode ? 'sel' : ''}" data-node="${n.id}">
             <circle class="hit" cx="${n.x}" cy="${n.y}" r="20"/>
             <circle class="core" cx="${n.x}" cy="${n.y}" r="7" fill="var(--accent)" stroke="var(--accent2)" stroke-width="1.5"/>
@@ -877,9 +877,33 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 
+/* ---------------- тема (светлая/тёмная) ---------------- */
+const THEME_KEY = 'garage.theme';
+function applyThemeIcon(){
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const moon = document.querySelector('#themeToggle .ic-moon');
+  const sun  = document.querySelector('#themeToggle .ic-sun');
+  if (moon && sun){ moon.style.display = light ? 'none' : ''; sun.style.display = light ? '' : 'none'; }
+}
+function initThemeToggle(){
+  const btn = $('#themeToggle');
+  if (!btn || btn.dataset.ready) return;
+  btn.dataset.ready = '1';
+  btn.onclick = () => {
+    const root = document.documentElement;
+    const light = root.getAttribute('data-theme') === 'light';
+    if (light) root.removeAttribute('data-theme'); else root.setAttribute('data-theme','light');
+    try { localStorage.setItem(THEME_KEY, light ? 'dark' : 'light'); } catch(e){}
+    applyThemeIcon();
+    toast(light ? 'Тёмная тема 🌙' : 'Светлая тема ☀️');
+  };
+  applyThemeIcon();
+}
+
 /* ---------------- boot ---------------- */
 buildNav();
-window.addEventListener('hashchange', renderApp);
+initThemeToggle();
+window.addEventListener('hashchange', () => { renderApp(); initThemeToggle(); });
 // если гараж пуст и юзер не входил — ничего не делаем; кнопка "демо" на дашборде
 renderApp();
 window.navigate = navigate; window.toast = toast; // для inline-обработчиков
