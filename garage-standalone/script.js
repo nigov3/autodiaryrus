@@ -78,7 +78,7 @@ function seedDemo() {
     return d.toISOString().slice(0, 10);
   };
   const car = {
-    id: uid(), ...info, mileage: 64850, nextTO_km: 70000, lastOilDate: mk(5, 12),
+    id: uid(), ...info, mileage: 64850, nextTO_km: 70000, lastOilDate: mk(5, 12), lastOilKm: 59800,
     policyEnd: mk(-11, 20), fines: [{ id: uid(), num: '03541877230112345678', sum: 500, date: mk(1, 8), desc: 'Превышение скорости (камера), Москва', paid: false }],
     health: { engine: 82, brakes: 64, oil: 45 },
     serviceHistory: [
@@ -108,6 +108,31 @@ function seedDemo() {
 }
 
 /* ---------------- stats ---------------- */
+
+// «живые» health-метрики: считаются из пробега и истории, а не хранятся мёртвыми числами
+function computeHealth(car) {
+  const h = { ...car.health };
+  // масло: убывает с км после последней замены (ТО/замена масла в расходах)
+  let lastOilKm = car.lastOilKm || 0;
+  car.expenses.filter(e => ['maint', 'repair'].includes(e.cat) && /масл|оил|oil|фильтр/i.test(e.desc) && e.km)
+    .forEach(e => { if (e.km > lastOilKm) lastOilKm = e.km; });
+  const sinceOil = Math.max(0, car.mileage - lastOilKm);
+  h.oil = Math.max(5, Math.min(100, Math.round(100 - sinceOil / car.oilEvery * 100)));
+  // тормоза: восстанавливаются при покупке колодок/дисков, иначе деградируют с пробегом
+  const brakeEvents = car.expenses.filter(e => /колодк|тормоз|disк|диск/i.test(e.desc));
+  if (brakeEvents.length) {
+    const kmAt = Math.max(...brakeEvents.map(e => e.km || 0), lastOilKm);
+    h.brakes = Math.max(10, Math.min(98, Math.round(98 - Math.max(0, car.mileage - kmAt) / 40000 * 88)));
+  } else {
+    h.brakes = Math.max(10, Math.min(100, Math.round(100 - car.mileage / 120000 * 100)));
+  }
+  // двигатель: общий износ + штрафы за игнор ТО
+  let eng = Math.max(20, Math.min(97, Math.round(97 - car.mileage / 300000 * 60)));
+  if (car.nextTO_km - car.mileage < 0) eng -= 5;
+  h.engine = Math.max(15, eng);
+  return h;
+}
+
 function calcStats(car) {
   const ex = car.expenses;
   const yNow = new Date().getFullYear();
@@ -383,7 +408,9 @@ function finishAuth(info, soc) {
     nextTO_km: 0, policyEnd: '', fines: [],
     health: { engine: 88, brakes: 78, oil: 70 },
     serviceHistory: [], expenses: [],
+    lastOilKm: 0, // будет = пробегу на момент добавления
   };
+  car.lastOilKm = car.mileage;
   car.nextTO_km = car.mileage + info.oilEvery;
   const d = new Date(); d.setMonth(d.getMonth() + 4);
   car.policyEnd = d.toISOString().slice(0, 10);
@@ -402,6 +429,7 @@ function renderDashboard(root) {
   if (!activeCar()) { root.innerHTML = emptyGarage(); bindEmpty(); return; }
   const car = activeCar();
   const st = calcStats(car);
+  const health = computeHealth(car);
   const toLeft = car.nextTO_km - car.mileage;
   const daysToPolicy = car.policyEnd ? Math.ceil((new Date(car.policyEnd) - new Date()) / 864e5) : null;
   const unpaid = car.fines.filter(f => !f.paid);
@@ -411,7 +439,7 @@ function renderDashboard(root) {
   if (toLeft <= 3000) alerts.push(['a-danger', '🛠', `ТО ${toLeft <= 0 ? 'просрочено' : 'скоро'}: осталось ${num(Math.max(toLeft, 0), 0)} км`, 'Замени масло и фильтры — запишись на ТО']);
   if (daysToPolicy !== null && daysToPolicy <= 45) alerts.push([daysToPolicy < 0 ? 'a-danger' : 'a-warn', '🛡', 'Полис ОСАГО ' + (daysToPolicy < 0 ? 'истёк' : 'истекает через ' + daysToPolicy + ' дн.'), 'Продли онлайн — калькулятор в профиле']);
   if (unpaid.length) alerts.push(['a-danger', '🚨', `${unpaid.length} неоплаченный штраф на ${money(unpaid.reduce((s, f) => s + f.sum, 0))}`, 'Оплати со скидкой 50% в первые 20 дней']);
-  if (car.health.oil < 50) alerts.push(['a-warn', '🛢', 'Срок службы масла на исходе', `Рекомендуемая замена через ${num(Math.max(toLeft, 0), 0)} км`]);
+  if (health.oil < 50) alerts.push(['a-warn', '🛢', 'Срок службы масла на исходе', `Рекомендуемая замена через ${num(Math.max(toLeft, 0), 0)} км`]);
 
   root.innerHTML = `
   <div class="container">
@@ -445,9 +473,9 @@ function renderDashboard(root) {
           <div class="spec"><span>пробег</span><b class="mono">${num(car.mileage, 0)} км</b></div>
         </div>
         <div class="field-label" style="margin-top:18px">Здоровье автомобиля</div>
-        ${[['Двигатель', car.health.engine], ['Тормоза', car.health.brakes], ['Масло', car.health.oil]].map(([l, v]) => `
+        ${[['Двигатель', health.engine], ['Тормоза', health.brakes], ['Масло', health.oil]].map(([l, v]) => `
           <div class="health-row">
-            <div class="health-lbl"><span>${l}</span><span class="mono" style="color:${hColor(v)}">${v}%</span></div>
+            <div class="health-lbl"><span>${l}</span><span class="mono" data-to="${v}" style="color:${hColor(v)}">0%</span></div>
             <div class="pbar"><div class="pfill" style="width:0%;background:${hColor(v)}" data-w="${v}"></div></div>
           </div>`).join('')}
       </div>
@@ -491,6 +519,17 @@ function renderDashboard(root) {
 
   requestAnimationFrame(() => $$('.pfill').forEach(p => p.style.width = p.dataset.w + '%'));
   $('#seedBtn').onclick = () => { if (!car.expenses.length) { seedInto(car); save(); toast('Демо-данные загружены'); renderApp(); } else toast('Данные уже есть 🙂'); };
+
+  // анимация «цифр» на дашборде (count-up для процентов здоровья)
+  animateNums();
+}
+
+function animateNums() {
+  $$('.health-lbl .mono[data-to]').forEach(el => {
+    const to = +el.dataset.to; let cur = 0;
+    const step = Math.max(1, Math.ceil(to / 28));
+    const iv = setInterval(() => { cur = Math.min(to, cur + step); el.textContent = cur + '%'; if (cur >= to) clearInterval(iv); }, 24);
+  });
 }
 
 function emptyGarage() {
@@ -520,19 +559,22 @@ function seedInto(car) {
    ============================================================ */
 let expFilter = 'all';
 let lastAddedId = null;
+let editingId = null;
 
 function renderExpenses(root) {
   const car = activeCar();
   if (!car) { root.innerHTML = emptyGarage(); bindEmpty(); return; }
   const st = calcStats(car);
   const list = [...car.expenses].sort((a, b) => b.date.localeCompare(a.date)).filter(e => expFilter === 'all' || e.cat === expFilter);
-
   root.innerHTML = `
   <div class="container">
     <div class="page-head">
       <div><div class="mono dim" style="font-size:12px;letter-spacing:.1em">// ДНЕВНИК РАСХОДОВ</div>
         <h2>${esc(car.make)} ${esc(car.model)}</h2></div>
-      <button class="btn btn-primary" id="addBtn">＋ Добавить расход</button>
+      <div class="row" style="gap:8px">
+        <button class="btn btn-ghost" id="csvBtn" title="Выгрузить все записи в CSV">⬇ CSV</button>
+        <button class="btn btn-primary" id="addBtn">＋ Добавить расход</button>
+      </div>
     </div>
 
     <div class="stat-grid">
@@ -541,8 +583,8 @@ function renderExpenses(root) {
       <div class="card stat"><div class="lbl">За месяц</div><div class="val">${money(st.monthTotal)}</div>
         ${st.delta === null ? '<div class="delta muted">нет данных за прошлый месяц</div>' :
           `<div class="delta ${st.delta > 0 ? 'up' : 'down'}">${st.delta > 0 ? '↑' : '↓'} ${Math.abs(st.delta)}% к прошлому месяцу</div>`}</div>
-      <div class="card stat"><div class="lbl">Стоимость 1 км</div><div class="val">${num(st.perKm, 1)} ₽</div>
-        <div class="delta muted">по пробегу в записях</div></div>
+      <div class="card stat"><div class="lbl">Стоимость 1 км</div><div class="val" id="perKmVal">${num(st.perKm, 1)} ₽</div>
+        <div class="delta ${st.perKm <= 5 ? 'down' : 'up'}">${st.perKm <= 5 ? '👍 дешевле среднего по классу' : '💡 выше среднего — проверь расходники'}</div></div>
       <div class="card stat"><div class="lbl">Средний расход</div><div class="val">${num(st.avgCons, 1)} л<span style="font-size:13px;color:var(--text3)">/100км</span></div>
         <div class="delta muted">бак ${car.tank} л · ${esc(car.engine.split(',')[0])}</div></div>
     </div>
@@ -556,6 +598,7 @@ function renderExpenses(root) {
       <div class="card card-pad">
         <div class="field-label" style="margin:0">По месяцам · 12 мес</div>
         <div class="bars">${renderBars(st.byMonth)}</div>
+        <div class="spark-note mono dim">${sparkInsight(st.byMonth)}</div>
       </div>
     </div>
 
@@ -573,13 +616,15 @@ function renderExpenses(root) {
     </div>
   </div>`;
 
-  $('#addBtn').onclick = openExpenseModal;
+  $('#addBtn').onclick = () => openExpenseModal();
+  $('#csvBtn').onclick = exportCSV;
   $$('.chip[data-f]').forEach(ch => ch.onclick = () => { expFilter = ch.dataset.f; renderExpenses(root); });
   $$('.exp-del').forEach(b => b.onclick = () => {
     const car2 = activeCar();
     car2.expenses = car2.expenses.filter(x => x.id !== b.dataset.id);
     save(); toast('Запись удалена'); renderExpenses(root);
   });
+  $$('.exp-edit').forEach(b => b.onclick = () => openExpenseModal(b.dataset.id));
   if (lastAddedId) { const el = $(`.exp-item[data-id="${lastAddedId}"]`); if (el) el.classList.add('new-flash'); lastAddedId = null; }
 }
 
@@ -591,6 +636,7 @@ function expItemHTML(e, car) {
     <div style="min-width:0"><b style="font-size:14.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.desc)}</b>
       <div class="muted" style="font-size:12.5px">${fmtDate(e.date)}${meta ? ' · ' + meta : ''}</div></div>
     <div class="exp-sum" style="color:${c.color}">${money(e.amount)}</div>
+    <button class="icon-btn exp-edit" data-id="${e.id}" title="Редактировать" style="width:32px;height:32px;font-size:13px">✎</button>
     <button class="icon-btn exp-del" data-id="${e.id}" title="Удалить" style="width:32px;height:32px;font-size:13px">✕</button>
   </div>`;
 }
@@ -619,7 +665,21 @@ function renderBars(byMonth) {
     </div>`).join('');
 }
 
-/* ---------------- expense modal ---------------- */
+// короткий текстовый инсайт по динамике трат
+function sparkInsight(byMonth) {
+  const withData = byMonth.filter(m => m.total > 0);
+  if (withData.length < 2) return 'Добавь пару записей — появится динамика.';
+  const last = byMonth[byMonth.length - 1], prev = byMonth[byMonth.length - 2];
+  const avg = withData.reduce((s, m) => s + m.total, 0) / withData.length;
+  const peak = withData.reduce((a, b) => (b.total > a.total ? b : a));
+  if (last.total === 0) return `Пик расходов: ${peak.label} (${money(peak.total)}). В этом месяце пока тишина.`;
+  const d = prev.total ? Math.round((last.total - prev.total) / prev.total * 100) : 0;
+  const trend = d === 0 ? 'на уровне прошлого месяца' : (d > 0 ? `+${d}% к прошлому` : `${d}% к прошлому`);
+  const vsAvg = last.total >= avg * 1.3 ? ' · заметно выше среднего за год' : last.total <= avg * 0.7 ? ' · ниже среднего — отлично' : '';
+  return `В этом месяце ${money(last.total)} — ${trend}${vsAvg}.`;
+}
+
+/* ---------------- expense modal (добавление + редактирование) ---------------- */
 let pickedCat = 'fuel';
 function buildCatGrid() {
   $('#catGrid').innerHTML = CATS.map(c => `
@@ -631,16 +691,26 @@ function buildCatGrid() {
     $('#litersField').hidden = pickedCat !== 'fuel';
   });
 }
-function openExpenseModal() {
+function openExpenseModal(id) {
   if (!activeCar()) { toast('Сначала добавь авто'); navigate('/'); return; }
+  editingId = id || null;
+  const rec = id ? activeCar().expenses.find(e => e.id === id) : null;
+  pickedCat = rec ? rec.cat : 'fuel';
   buildCatGrid();
-  $('#expDate').value = todayISO();
+  $('#modalTitle').textContent = rec ? 'Редактировать расход' : 'Новый расход';
+  $('#submitBtn').textContent = rec ? 'Сохранить изменения' : 'Сохранить';
+  $('#expDesc').value = rec ? rec.desc : '';
+  $('#expAmount').value = rec ? rec.amount : '';
+  $('#expDate').value = rec ? rec.date : todayISO();
+  $('#expKm').value = rec && rec.km ? rec.km : '';
   $('#expKm').placeholder = String(activeCar().mileage);
+  $('#expLiters').value = rec && rec.liters ? rec.liters : '';
+  $('#expPlace').value = rec && rec.place ? rec.place : '';
   $('#litersField').hidden = pickedCat !== 'fuel';
   $('#expenseModal').hidden = false;
   $('#expDesc').focus();
 }
-function closeExpenseModal() { $('#expenseModal').hidden = true; $('#expenseForm').reset(); }
+function closeExpenseModal() { $('#expenseModal').hidden = true; editingId = null; }
 
 $('#closeModal').onclick = closeExpenseModal;
 $('#cancelModal').onclick = closeExpenseModal;
@@ -651,7 +721,7 @@ $('#expenseForm').onsubmit = (e) => {
   e.preventDefault();
   const car = activeCar();
   const rec = {
-    id: uid(), cat: pickedCat,
+    id: editingId || uid(), cat: pickedCat,
     desc: $('#expDesc').value.trim() || catById(pickedCat).name,
     amount: parseFloat($('#expAmount').value) || 0,
     date: $('#expDate').value || todayISO(),
@@ -660,16 +730,52 @@ $('#expenseForm').onsubmit = (e) => {
     place: $('#expPlace').value.trim() || undefined,
   };
   if (rec.amount <= 0) { toast('Введи сумму'); return; }
-  car.expenses.unshift(rec);
+  if (editingId) {
+    const idx = car.expenses.findIndex(x => x.id === editingId);
+    if (idx >= 0) car.expenses[idx] = rec;
+  } else {
+    car.expenses.unshift(rec);
+  }
   if (rec.km) car.mileage = Math.max(car.mileage, rec.km);
-  if (['maint', 'repair'].includes(rec.cat)) car.serviceHistory.unshift({ date: rec.date, title: rec.desc, cat: rec.cat, cost: rec.amount });
+  // история обслуживания: одна запись на событие ТО/ремонта, синхронно с расходом
+  const isService = ['maint', 'repair'].includes(rec.cat);
+  const hi = car.serviceHistory.findIndex(h => h.srcId === rec.id);
+  if (isService) {
+    const entry = { date: rec.date, title: rec.desc, cat: rec.cat, cost: rec.amount, srcId: rec.id };
+    if (hi >= 0) car.serviceHistory[hi] = entry; else car.serviceHistory.unshift(entry);
+  } else if (hi >= 0) {
+    car.serviceHistory.splice(hi, 1); // категорию убрали из сервисных — чистим историю
+  }
+  // после замены масла / ТО — сбрасываем счётчик масла и двигаем следующее ТО
+  if (isService && /масл|oil/i.test(rec.desc)) {
+    car.lastOilKm = rec.km || car.mileage;
+    car.nextTO_km = (rec.km || car.mileage) + car.oilEvery;
+  }
   save();
   closeExpenseModal();
   lastAddedId = rec.id;
   expFilter = 'all';
-  toast('Расход добавлен ✓');
+  toast(editingId ? 'Изменения сохранены ✓' : 'Расход добавлен ✓');
   if (currentPath() === '/expenses') renderExpenses($('#app')); else navigate('/expenses');
 };
+
+/* ---------------- экспорт расходов в CSV ---------------- */
+function exportCSV() {
+  const car = activeCar();
+  if (!car || !car.expenses.length) { toast('Нечего экспортировать'); return; }
+  const rows = [['Дата', 'Категория', 'Описание', 'Сумма, руб', 'Пробег, км', 'Литры', 'Место']];
+  [...car.expenses].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
+    rows.push([e.date, catById(e.cat).name, `"${(e.desc || '').replace(/"/g, '""')}"`, e.amount, e.km ?? '', e.liters ?? '', `"${(e.place || '').replace(/"/g, '""')}"`]);
+  });
+  const csv = '\uFEFF' + rows.map(r => r.join(';')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `garage-${car.make}-${car.model}-2026.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('CSV выгружен ⬇');
+}
 
 /* ============================================================
    PAGE: PARTS (запчасти по VIN)
@@ -736,6 +842,22 @@ const PARTS = {
 };
 const TYPE_BADGE = { orig: ['b-ok', 'Оригинал'], analogue: ['b-warn', 'Аналог'], used: ['b-info', 'Б/У'] };
 let selNode = 'engine';
+let partTypeFilter = 'all';
+let partQuery = '';
+
+// персонализация под конкретный VIN: цены зависят от модели
+function priceFactor(car) {
+  const m = (car.model || '').toLowerCase();
+  if (m.includes('golf')) return 1;
+  if (m.includes('rio')) return 0.72;
+  if (m.includes('rav4')) return 1.35;
+  if (m.includes('3 series') || car.make === 'BMW') return 1.6;
+  return 1.15;
+}
+function personalizeOffers(car, p) {
+  const f = priceFactor(car);
+  return p.offers.map(o => ({ ...o, price: o.price ? Math.round(o.price * f / 100) * 100 : 0 }));
+}
 
 function renderParts(root) {
   const car = activeCar();
@@ -745,7 +867,7 @@ function renderParts(root) {
     <div class="page-head">
       <div><div class="mono dim" style="font-size:12px;letter-spacing:.1em">// ПОДБОР ПО VIN</div>
         <h2>Запчасти · ${esc(car.make)} ${esc(car.model)}</h2></div>
-      <span class="badge b-info mono">${esc(car.vin)}</span>
+      <span class="badge b-info mono" title="VIN активного авто">${esc(car.vin.slice(0, 8))}…${esc(car.vin.slice(-4))}</span>
     </div>
     <div class="parts-cols">
       <div class="card card-pad hud-frame">
@@ -761,23 +883,41 @@ function renderParts(root) {
           ${NODES.map(n => `<span class="chip ${n.id === selNode ? 'on' : ''}" data-node="${n.id}">${n.label}</span>`).join('')}
         </div>
       </div>
-      <div id="partsList">${partsListHTML(selNode)}</div>
+      <div>
+        <div class="card card-pad" style="padding:14px 16px;margin-bottom:14px">
+          <div class="row" style="gap:10px;flex-wrap:wrap">
+            <input id="partSearch" class="input" placeholder="🔍 Поиск: название или артикул…" value="${esc(partQuery)}" style="flex:1;min-width:180px"/>
+            ${[['all', 'Все типы'], ['orig', 'Оригинал'], ['analogue', 'Аналог'], ['used', 'Б/У']].map(([id, lbl]) =>
+              `<span class="chip ${partTypeFilter === id ? 'on' : ''}" data-tf="${id}">${lbl}</span>`).join('')}
+          </div>
+        </div>
+        <div id="partsList">${partsListHTML(car, selNode)}</div>
+      </div>
     </div>
   </div>`;
   $$('.node,.chip[data-node]').forEach(el => el.onclick = () => {
     selNode = el.dataset.node;
     $$('.node').forEach(n => n.classList.toggle('sel', n.dataset.node === selNode));
     $$('.chip[data-node]').forEach(c => c.classList.toggle('on', c.dataset.node === selNode));
-    $('#partsList').innerHTML = partsListHTML(selNode);
+    $('#partsList').innerHTML = partsListHTML(activeCar(), selNode);
   });
+  $$('[data-tf]').forEach(ch => ch.onclick = () => {
+    partTypeFilter = ch.dataset.tf;
+    $$('[data-tf]').forEach(c => c.classList.toggle('on', c.dataset.tf === partTypeFilter));
+    $('#partsList').innerHTML = partsListHTML(activeCar(), selNode);
+  });
+  const si = $('#partSearch');
+  si.oninput = () => { partQuery = si.value.trim().toLowerCase(); $('#partsList').innerHTML = partsListHTML(activeCar(), selNode); };
 }
 
-function partsListHTML(nodeId) {
+function partsListHTML(car, nodeId) {
   const node = NODES.find(n => n.id === nodeId);
-  const items = PARTS[nodeId] || [];
-  return `<div class="card card-pad" style="padding-bottom:8px"><b style="font-family:Unbounded">⚙️ ${node.label}</b>
+  let items = (PARTS[nodeId] || []).map(p => ({ ...p, offers: personalizeOffers(car, p) }));
+  if (partTypeFilter !== 'all') items = items.map(p => ({ ...p, offers: p.offers.filter(o => o.type === partTypeFilter) })).filter(p => p.offers.length);
+  if (partQuery) items = items.filter(p => (p.name + ' ' + p.offers.map(o => o.brand + ' ' + o.art).join(' ')).toLowerCase().includes(partQuery));
+  return `<div class="card card-pad" style="padding-bottom:8px"><b style="font-family:Unbounded">⚙️ ${esc(node.label)}</b>
     <span class="muted" style="font-size:13px"> · подобрано по VIN · ${items.length} позиции</span></div>
-    ${items.map(p => partCardHTML(p)).join('')}`;
+    ${items.length ? items.map(p => partCardHTML(p)).join('') : '<div class="card card-pad"><div class="muted">Ничего не найдено — попробуй другой запрос или тип.</div></div>'}`;
 }
 
 function partCardHTML(p) {
@@ -817,9 +957,24 @@ function renderProfile(root) {
           <div class="sum-ic">${c.id === state.activeCarId ? '🟦' : '⬜'}</div>
           <div style="flex:1"><b>${esc(c.make + ' ' + c.model)}</b>
             <div class="muted mono" style="font-size:12px">${esc(c.vin)} · ${num(c.mileage, 0)} км</div></div>
+          <button class="icon-btn" data-edit="${c.id}" title="Изменить пробег / VIN" style="width:32px;height:32px;font-size:13px">✎</button>
           <button class="icon-btn" data-del="${c.id}" title="Удалить" style="width:32px;height:32px;font-size:13px">✕</button>
         </div>`).join('')}
         <button class="btn btn-ghost btn-sm" style="margin-top:12px;width:100%" onclick="navigate('/')">＋ Добавить автомобиль</button>
+        ${car ? `
+        <div id="editCarBox" hidden style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:16px">
+          <div class="field-label" style="margin:0 0 8px">Редактирование · ${esc(car.make)} ${esc(car.model)}</div>
+          <div class="form-row" style="gap:10px">
+            <div class="field grow"><label class="field-label" for="edMileage">Пробег, км</label>
+              <input id="edMileage" class="input mono" type="number" min="0" value="${car.mileage}"/></div>
+            <div class="field grow"><label class="field-label" for="edVin">VIN</label>
+              <input id="edVin" class="input mono" value="${esc(car.vin)}" maxlength="17"/></div>
+          </div>
+          <div class="row" style="gap:8px;margin-top:10px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" id="edCancel">Отмена</button>
+            <button class="btn btn-primary btn-sm" id="edSave">Сохранить</button>
+          </div>
+        </div>` : ''}
       </div>
       <div class="grid" style="align-content:start">
         <div class="card card-pad">
@@ -840,7 +995,29 @@ function renderProfile(root) {
     </div>
   </div>`;
   $('#logout').onclick = () => { state.user = null; save(); toast('Вышли'); navigate('/'); };
-  $$('[data-sw]').forEach(el => el.onclick = (ev) => { if (ev.target.closest('[data-del]')) return; state.activeCarId = el.dataset.sw; save(); renderApp(); });
+  $$('[data-sw]').forEach(el => el.onclick = (ev) => { if (ev.target.closest('[data-del],[data-edit]')) return; state.activeCarId = el.dataset.sw; save(); renderApp(); });
+  $$('[data-edit]').forEach(b => b.onclick = () => {
+    const c = state.cars.find(x => x.id === b.dataset.edit);
+    state.activeCarId = c.id; save();
+    renderProfile(root);
+    const box = $('#editCarBox'); if (box) { box.hidden = false; $('#edMileage')?.focus(); }
+  });
+  if (car) {
+    $('#edCancel').onclick = () => renderProfile(root);
+    $('#edSave').onclick = () => {
+      const km = parseInt($('#edMileage').value, 10);
+      const vin = $('#edVin').value.trim().toUpperCase();
+      if (!(km >= 0)) { toast('Проверь пробег'); return; }
+      if (vin !== car.vin) {
+        if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) { toast('VIN: 17 символов без I/O/Q'); return; }
+        const info = decodeVin(vin);
+        Object.assign(car, { vin, make: info.make, model: info.model, year: info.year, trim: info.trim, engine: info.engine, trans: info.trans, drive: info.drive, body: info.body, tank: info.tank, oilEvery: info.oilEvery, issues: info.issues, recall: info.recall });
+      }
+      car.mileage = km;
+      if (!car.lastOilKm || car.lastOilKm > km) car.lastOilKm = Math.max(0, km - 5000);
+      save(); toast('Авто обновлено ✓'); renderApp();
+    };
+  }
   $$('[data-del]').forEach(b => b.onclick = () => {
     state.cars = state.cars.filter(c => c.id !== b.dataset.del);
     if (!state.cars.find(c => c.id === state.activeCarId)) state.activeCarId = state.cars[0]?.id || null;
