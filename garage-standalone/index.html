@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GARAGE — хаб автовладельца</title>
+  <meta name="description" content="GARAGE: добавь авто по VIN и получи запчасти, ремонт, страхование, учёт расходов и штрафы — всё персонализировано под твою машину." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <script>try{if(localStorage.getItem('garage.theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Шумовой оверлей -->
+  <div class="noise"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#/" class="logo">
+        <span class="logo-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="url(#lg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <defs><linearGradient id="lg" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#0066FF"/><stop offset="1" stop-color="#00D6FF"/></linearGradient></defs>
+            <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/>
+            <path d="M3 16v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1"/>
+            <path d="M6 17H4a1 1 0 0 1-1-1v-3"/>
+            <circle cx="7.5" cy="17" r="1.7"/><circle cx="16.5" cy="17" r="1.7"/>
+          </svg>
+        </span>
+        <span class="logo-text">GARAGE</span>
+      </a>
+
+      <nav class="desktop-nav" id="mainNav"><!-- JS --></nav>
+
+      <div class="header-right">
+        <div class="car-switcher" id="carSwitcher" hidden><!-- JS --></div>
+                <button class="icon-btn" id="themeToggle" title="Сменить тему" aria-label="Переключить светлую/тёмную тему">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path class="ic-moon" d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/><g class="ic-sun" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5 5l1.6 1.6M17.4 17.4 19 19M19 5l-1.6 1.6M6.6 17.4 5 19"/></g></svg>
+        </button>
+        <a href="#/login" class="btn btn-ghost" id="loginBtn">Войти</a>
+        <button class="btn btn-primary" id="ctaHeader">Добавить авто</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== APP ===== -->
+  <main id="app"><!-- страницы рендерит JS --></main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <div class="logo" style="margin-bottom:10px"><span class="logo-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00D6FF" stroke-width="2" stroke-linecap="round"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><path d="M3 16v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="17" r="1.7"/><circle cx="16.5" cy="17" r="1.7"/></svg></span><span class="logo-text">GARAGE</span></div>
+        <p class="muted" style="max-width:340px;font-size:14px">Персональный хаб автовладельца. Вин ввёл — гараж построил.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#/">Главная</a><a href="#/dashboard">Гараж</a><a href="#/expenses">Расходы</a><a href="#/parts">Запчасти</a>
+      </div>
+    </div>
+    <div class="container" style="border-top:1px solid var(--border);padding-top:16px;margin-top:24px">
+      <span class="dim mono" style="font-size:12px">© 2026 GARAGE · MVP demo · данные хранятся локально (localStorage)</span>
+    </div>
+  </footer>
+
+  <!-- ===== MOBILE BOTTOM NAV ===== -->
+  <nav class="bottom-nav" id="bottomNav">
+    <a href="#/" data-route="/"><svg viewBox="0 0 24 24" class="ic"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Главная</span></a>
+    <a href="#/dashboard" data-route="/dashboard"><svg viewBox="0 0 24 24" class="ic"><path d="M4 17V9l2-5h12l2 5v8"/><path d="M4 17h16"/><circle cx="8" cy="17.5" r="1.6"/><circle cx="16" cy="17.5" r="1.6"/></svg><span>Гараж</span></a>
+    <a href="#/expenses" data-route="/expenses"><svg viewBox="0 0 24 24" class="ic"><path d="M4 19V6"/><path d="M4 19h16"/><rect x="7.5" y="12" width="3" height="4.5" rx="1"/><rect x="12.5" y="9" width="3" height="7.5" rx="1"/><rect x="17" y="6.5" width="3" height="10" rx="1"/></svg><span>Расходы</span></a>
+    <a href="#/parts" data-route="/parts"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg><span>Запчасти</span></a>
+    <a href="#/profile" data-route="/profile"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-3.4 4.2-5 7.5-5s6.1 1.6 7.5 5"/></svg><span>Профиль</span></a>
+  </nav>
+  <button class="fab" id="fab" title="Добавить расход" hidden>+</button>
+
+  <!-- ===== MODAL: добавить расход ===== -->
+  <div class="modal-overlay" id="expenseModal" hidden>
+    <div class="modal card">
+      <div class="modal-head">
+        <h3>Новый расход</h3>
+        <button class="icon-btn" id="closeModal" aria-label="Закрыть">✕</button>
+      </div>
+      <form id="expenseForm">
+        <label class="field-label">Категория</label>
+        <div class="cat-grid" id="catGrid"><!-- JS --></div>
+
+        <div class="form-row">
+          <div class="field grow">
+            <label class="field-label" for="expDesc">Описание</label>
+            <input id="expDesc" class="input" placeholder="Например: заправка АИ-95" required maxlength="80" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="expAmount">Сумма, ₽</label>
+            <input id="expAmount" class="input mono" type="number" min="1" step="1" placeholder="2500" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label class="field-label" for="expDate">Дата</label>
+            <input id="expDate" class="input" type="date" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="expKm">Пробег, км</label>
+            <input id="expKm" class="input mono" type="number" min="0" placeholder="65400" />
+          </div>
+          <div class="field" id="litersField" hidden>
+            <label class="field-label" for="expLiters">Литры</label>
+            <input id="expLiters" class="input mono" type="number" min="0" step="0.1" placeholder="42.5" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="expPlace">Место / примечание</label>
+          <input id="expPlace" class="input" placeholder="Лукойл на Ленина" maxlength="60" />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="cancelModal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
